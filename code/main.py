@@ -1,11 +1,17 @@
 import cv
 import cv2
 import time
+import io
 from PIL import Image
 import numpy as np
 import csv
 import logistic
 import mouthdetection as m
+
+import picamera.array
+from picamera.array import PiArrayOutput
+from picamera import PiCamera
+
 
 WIDTH, HEIGHT = 28, 10 # all mouth images will be resized to the same size
 dim = WIDTH * HEIGHT # dimension of feature vector
@@ -83,41 +89,35 @@ if __name__ == '__main__':
     lr = logistic.Logistic(dim)
     lr.train(phi, labels)
     
-
     """
-    open webcam and capture images
+    initialize picamera module
     """
-    cv2.namedWindow("preview")
-    vc = cv2.VideoCapture(0)
-
-    if vc.isOpened(): # try to get the first frame
-        rval, frame = vc.read()
-    else:
-        rval = False
-
-    print "\n\n\n\n\npress space to take picture; press ESC to exit"
-
-    while rval:
-        cv2.imshow("preview", frame)
-        rval, frame = vc.read()
-        key = cv2.waitKey(40)
-        if key == 27: # exit on ESC
-            break
-        if key == 32: # press space to save images
-            cv.SaveImage("webcam.jpg", cv.fromarray(frame))
-            img = cv.LoadImage("webcam.jpg") # input image
-            mouth = m.findmouth(img)
-            # show(mouth)
-            if mouth != 2: # did not return error
-                mouthimg = crop(mouth)
-                cv.SaveImage("webcam-m.jpg", mouthimg)
-                # predict the captured emotion
-                result = lr.predict(vectorize('webcam-m.jpg'))
-                if result == 1:
-                    print "you are smiling! :-) "
-                else:
-                    print "you are not smiling :-| "
-            else:
-                print "failed to detect mouth. Try hold your head straight and make sure there is only one face."
     
-    cv2.destroyWindow("preview")
+    with PiCamera() as camera:
+        camera.resolution = (640, 480)
+        camera.framerate = 15
+        with PiArrayOutput(camera) as output:
+            for frame in camera.capture_continuous(output, format="bgr",
+                                                use_video_port=True):
+                output.flush()
+                f = picamera.array.bytes_to_rgb(frame.getvalue(), camera.resolution)
+                img = np.empty_like(f)
+                img[:] = f
+                img = cv.fromarray(img)
+                output.truncate()
+                output.seek(0)
+                #print img
+                mouth = m.findmouth(img)
+                # show(mouth)
+                if mouth != 2: # did not return error
+                    mouthimg = crop(mouth)
+                    cv.SaveImage("webcam-m.jpg", mouthimg)
+                    # predict the captured emotion
+                    result = lr.predict(vectorize('webcam-m.jpg'))
+                    if result == 1:
+                        print "you are smiling! :-) "
+                    else:
+                        print "you are not smiling :-| "
+                else: print "face not detected"
+                
+

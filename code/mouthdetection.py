@@ -5,11 +5,15 @@ output: [[x,y],[width,height]] of the detected mouth area
 
 import cv
 
-def findmouth(img):
+haarFace = None
+haarMouth = None
 
+def findmouth(img):
+  global haarFace, haarMouth
   # INITIALIZE: loading the classifiers
-  haarFace = cv.Load('haarcascade_frontalface_default.xml')
-  haarMouth = cv.Load('haarcascade_mouth.xml')
+  if not haarFace or not haarMouth:
+    haarFace = cv.Load('haarcascade_frontalface_default.xml')
+    haarMouth = cv.Load('haarcascade_mouth.xml')
   # running the classifiers
   storage = cv.CreateMemStorage()
   detectedFace = cv.HaarDetectObjects(img, haarFace, storage)
